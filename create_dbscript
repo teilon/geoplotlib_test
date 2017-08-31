@@ -1,0 +1,54 @@
+create table region(
+id serial primary key,
+name varchar(50) not null
+);
+
+create table state_status(
+id serial primary key,
+name varchar(50) not null
+);
+
+create table cities(
+id serial not null,
+name varchar(50) not null,
+population integer not null,
+status integer not null,
+region integer not null,
+primary key (id),
+foreign key(status) references state_status(id) on delete cascade,
+foreign key(region) references region(id) on delete cascade
+);
+
+alter table cities add latitude float;
+alter table cities add longitude float;
+alter table cities add last_date date not null;
+alter table cities add last_user varchar(20) not null;
+
+
+//------trigger stamp
+create function cities_stamp() returns trigger as $cities_stamp$
+begin
+	new.last_date := current_timestamp;
+	new.last_user := current_user;
+	return new;
+end;
+$cities_stamp$ language plpgsql;
+
+create trigger cities_stamp before insert or update on cities
+	for each row execute procedure cities_stamp();
+
+
+//-------function insert/update to cities
+create or replace function upsert_to_cities(n varchar(50), p integer, s integer, r integer) returns void as $upsert_to_cities$
+declare
+	city_row varchar(50);
+begin
+	select name into city_row from cities where name = n and region = r;
+	if not found then
+		insert into cities (name, population, status, region) values (n, p, s, r);
+	else
+		update cities set population = p, status = s where name = n and region = r;
+	end if;
+	return;
+end;
+$upsert_to_cities$ language plpgsql;
